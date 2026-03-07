@@ -408,3 +408,32 @@ LOGGING = {
         "trmm": {"handlers": ["trmm"], "level": get_log_level(), "propagate": False},
     },
 }
+
+
+# GuardianRMM: Startup configuration validation
+def _validate_settings():
+    errors = []
+
+    if "GHACTIONS" not in os.environ:
+        if not globals().get("SECRET_KEY"):
+            errors.append("SECRET_KEY is not set. Generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'")
+        elif len(globals().get("SECRET_KEY", "")) < 50:
+            errors.append("SECRET_KEY is too short (minimum 50 characters)")
+
+        if DEBUG and not os.environ.get("GUARDIANRMM_ALLOW_DEBUG"):
+            import warnings
+            warnings.warn(
+                "GuardianRMM: DEBUG=True detected. Set GUARDIANRMM_ALLOW_DEBUG=1 to suppress this warning.",
+                stacklevel=2,
+            )
+
+        allowed = globals().get("ALLOWED_HOSTS", [])
+        if "*" in allowed:
+            errors.append("ALLOWED_HOSTS contains wildcard '*'. This is a security risk.")
+
+    if errors:
+        for e in errors:
+            print(f"[GuardianRMM SECURITY] {e}", file=sys.stderr)
+
+
+_validate_settings()

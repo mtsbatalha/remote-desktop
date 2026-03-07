@@ -129,7 +129,7 @@ class DemoMiddleware:
 
         try:
             view_Name = view_func.__dict__["view_class"].__name__
-        except:
+        except (KeyError, AttributeError):
             return
         for i in self.not_allowed:
             if view_Name == i["name"] and request.method in i["methods"]:
