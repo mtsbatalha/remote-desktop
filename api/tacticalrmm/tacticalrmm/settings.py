@@ -105,7 +105,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, "static")
 STATICFILES_DIRS = [os.path.join(BASE_DIR, "tacticalrmm/static/")]
 
 REST_KNOX = {
-    "TOKEN_TTL": timedelta(hours=5),
+    "TOKEN_TTL": timedelta(hours=1),
     "AUTO_REFRESH": True,
     "MIN_REFRESH_INTERVAL": 600,
 }
@@ -160,7 +160,7 @@ if not DOCKER_BUILD:
     ALLOWED_HOSTS.append(frontend_domain)
 
     if DEBUG:
-        ALLOWED_HOSTS.append("*")
+        ALLOWED_HOSTS.extend(["localhost", "127.0.0.1"])
 
     backend_url = get_backend_url(ALLOWED_HOSTS[0], TRMM_PROTO, TRMM_BACKEND_PORT)
 
@@ -188,7 +188,27 @@ REST_FRAMEWORK = {
         "tacticalrmm.auth.APIAuthentication",
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/minute",
+        "user": "200/minute",
+    },
 }
+
+# Security Headers (GuardianRMM hardening)
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_BROWSER_XSS_FILTER = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Tactical RMM API",

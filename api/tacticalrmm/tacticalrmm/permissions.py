@@ -41,8 +41,9 @@ def _has_perm_on_agent(user: "User", agent_id: str) -> bool:
     can_view_clients = role.can_view_clients.all() if role else None
     can_view_sites = role.can_view_sites.all() if role else None
 
+    # Deny by default: no explicit grants = no access
     if not can_view_clients and not can_view_sites:
-        return True
+        return False
 
     elif can_view_clients and agent.client in can_view_clients:
         return True
@@ -67,8 +68,9 @@ def _has_perm_on_client(user: "User", client_id: int) -> bool:
     client = get_object_or_404(Client, pk=client_id)
     can_view_clients = role.can_view_clients.all() if role else None
 
+    # Deny by default: no explicit grants = no access
     if not can_view_clients:
-        return True
+        return False
 
     elif can_view_clients and client in can_view_clients:
         return True
@@ -91,8 +93,9 @@ def _has_perm_on_site(user: "User", site_id: int) -> bool:
     can_view_clients = role.can_view_clients.all() if role else None
     can_view_sites = role.can_view_sites.all() if role else None
 
+    # Deny by default: no explicit grants = no access
     if not can_view_clients and not can_view_sites:
-        return True
+        return False
 
     elif can_view_sites and site in can_view_sites:
         return True
