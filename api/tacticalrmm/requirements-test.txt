@@ -1,0 +1,11 @@
+coverage
+model_bakery
+black
+pytest
+pytest-django
+pytest-xdist
+pytest-cov
+refurb
+flake8
+daphne
+time-machine
