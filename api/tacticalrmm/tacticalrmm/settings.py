@@ -143,7 +143,7 @@ if "GHACTIONS" in os.environ:
             "PORT": "",
         }
     }
-    SECRET_KEY = "abcdefghijklmnoptravis123456789"
+    SECRET_KEY = os.environ.get("SECRET_KEY", "ci-only-" + os.urandom(32).hex())
     ALLOWED_HOSTS = ["api.example.com"]
     ADMIN_URL = "abc123456/"
     CORS_ORIGIN_WHITELIST = ["https://rmm.example.com"]

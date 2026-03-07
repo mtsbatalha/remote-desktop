@@ -106,11 +106,7 @@ class LoginViewV2(KnoxLoginView):
         token = request.data["twofactor"]
         totp = pyotp.TOTP(user.totp_key)
 
-        if settings.DEBUG and token == "sekret":
-            valid = True
-        elif getattr(settings, "DEMO", False):
-            valid = True
-        elif totp.verify(token, valid_window=10):
+        if totp.verify(token, valid_window=1):
             valid = True
 
         if valid:

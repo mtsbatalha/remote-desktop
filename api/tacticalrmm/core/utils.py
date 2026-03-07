@@ -123,7 +123,8 @@ async def get_mesh_device_id(uri: str, device_group: str) -> None:
 
 def download_mesh_agent(dl_url: str) -> FileResponse:
     with tempfile.NamedTemporaryFile(prefix="mesh-", dir=settings.EXE_DIR) as fp:
-        r = requests.get(dl_url, stream=True, timeout=15, verify=False)
+        mesh_ca_bundle = getattr(settings, "MESH_CA_BUNDLE", True)
+        r = requests.get(dl_url, stream=True, timeout=15, verify=mesh_ca_bundle)
         with open(fp.name, "wb") as f:
             for chunk in r.iter_content(chunk_size=1024):
                 if chunk:

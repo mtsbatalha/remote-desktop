@@ -21,11 +21,10 @@ func Svc(logger *logrus.Logger, cfg string) {
 	}
 
 	opts := []nats.Option{
-		nats.Name("trmm-nats-api"),
+		nats.Name("guardianrmm-nats-api"),
 		nats.UserInfo("tacticalrmm", r.Key),
 		nats.ReconnectWait(time.Second * 2),
 		nats.RetryOnFailedConnect(true),
-		nats.IgnoreAuthErrorAbort(),
 		nats.MaxReconnects(-1),
 		nats.ReconnectBufSize(-1),
 		nats.DisconnectErrHandler(func(nc *nats.Conn, nerr error) {
