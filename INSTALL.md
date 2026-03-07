@@ -1,0 +1,359 @@
+# GuardianRMM — Guia de Instalação e Configuração
+
+GuardianRMM é um fork seguro e otimizado do TacticalRMM, com hardening de segurança aplicado (bypass de 2FA removido, permissões deny-by-default, rate limiting, security headers e mais).
+
+---
+
+## Requisitos
+
+### Instalação em Servidor (Bare Metal / VM)
+
+| Item | Requisito |
+|------|-----------|
+| OS | Debian 11/12 ou Ubuntu 22.04 LTS |
+| RAM | 4 GB mínimo (8 GB recomendado) |
+| CPU | x86_64 ou aarch64 |
+| Disco | 20 GB livre |
+| Usuário | Não-root com sudo |
+| Domínios | 3 subdomínios apontando para o servidor |
+
+### Instalação via Docker
+
+| Item | Requisito |
+|------|-----------|
+| Docker | 20.10+ |
+| Docker Compose | 2.0+ |
+| RAM | 4 GB mínimo |
+| Disco | 20 GB livre |
+
+---
+
+## Pré-requisitos: DNS
+
+Você precisará de 3 registros DNS do tipo A apontando para o IP do servidor:
+
+```
+rmm.example.com     → IP_DO_SERVIDOR
+api.example.com     → IP_DO_SERVIDOR
+mesh.example.com    → IP_DO_SERVIDOR
+```
+
+---
+
+## Instalação em Servidor (Script)
+
+```bash
+# Baixar e executar o script de instalação
+wget -q https://raw.githubusercontent.com/<seu-repo>/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+O script irá:
+1. Verificar requisitos (OS, RAM, arquitetura)
+2. Instalar dependências (PostgreSQL, Redis, NATS, Python, Nginx)
+3. Configurar certificados SSL (Let's Encrypt ou self-signed)
+4. Criar banco de dados com credenciais aleatórias
+5. Configurar NexusMesh (MeshCentral) integrado
+6. Criar serviços systemd
+7. Gerar QR code para autenticação 2FA
+
+---
+
+## Instalação via Docker
+
+### 1. Preparar configuração
+
+```bash
+cd docker/
+cp .env.example .env
+```
+
+### 2. Editar o arquivo `.env`
+
+```bash
+nano .env
+```
+
+```env
+IMAGE_REPO=guardianrmm/
+VERSION=latest
+
+# Credenciais do dashboard (trocar em produção)
+TRMM_USER=tactical
+TRMM_PASS=tactical
+
+# Portas HTTP/HTTPS
+TRMM_HTTP_PORT=80
+TRMM_HTTPS_PORT=443
+
+# Domínios (obrigatório configurar)
+APP_HOST=rmm.example.com
+API_HOST=api.example.com
+MESH_HOST=mesh.example.com
+
+# Integração MeshCentral
+MESH_USER=tactical
+MESH_PASS=tactical
+MONGODB_USER=mongouser
+MONGODB_PASSWORD=mongopass
+MESH_PERSISTENT_CONFIG=0
+
+# Banco de dados
+POSTGRES_USER=postgres
+POSTGRES_PASS=postgrespass
+
+# Funcionalidades (True/False)
+TRMM_DISABLE_WEB_TERMINAL=False
+TRMM_DISABLE_SERVER_SCRIPTS=False
+TRMM_DISABLE_SSO=False
+```
+
+> **Produção:** Troque todas as senhas por valores fortes antes de expor externamente.
+
+### 3. Iniciar os serviços
+
+```bash
+docker-compose up -d
+```
+
+### 4. Verificar status
+
+```bash
+docker-compose ps
+docker-compose logs -f tactical-backend
+```
+
+---
+
+## Serviços Docker
+
+| Container | Função | Rede |
+|-----------|--------|------|
+| `trmm-postgres` | Banco de dados principal (PostgreSQL 13) | api-db |
+| `trmm-redis` | Cache e filas Celery (Redis 6) | redis |
+| `trmm-init` | Inicialização e migração do ambiente | api-db, proxy, redis |
+| `trmm-nats` | Message broker para agentes | proxy |
+| `trmm-meshcentral` | Servidor NexusMesh integrado | proxy, mesh-db |
+| `trmm-mongodb` | Banco de dados do NexusMesh (MongoDB) | mesh-db |
+| `trmm-frontend` | Interface web (Vue.js) | proxy |
+| `trmm-backend` | API Django | api-db, proxy, redis |
+| `trmm-websockets` | WebSocket via Django Channels | proxy, redis |
+| `trmm-nginx` | Reverse proxy e TLS | proxy |
+| `trmm-celery` | Worker de tarefas assíncronas | api-db, proxy, redis |
+| `trmm-celerybeat` | Scheduler de tarefas periódicas | api-db, proxy, redis |
+
+---
+
+## Portas Utilizadas
+
+| Porta | Protocolo | Serviço | Exposta |
+|-------|-----------|---------|---------|
+| 80 | HTTP | Nginx (redirect) | Sim |
+| 443 | HTTPS | Nginx (frontend + API) | Sim |
+| 4222 | TCP | NATS (agentes) | Sim |
+| 9235 | WebSocket | NATS WebSocket | Sim |
+| 4430 | HTTPS | NexusMesh (interno) | Não |
+| 5432 | TCP | PostgreSQL | Não |
+| 6379 | TCP | Redis | Não |
+| 27017 | TCP | MongoDB | Não |
+
+---
+
+## Configuração do Django (local_settings.py)
+
+Para instalações bare metal, o arquivo de configuração local fica em:
+`/rmm/api/tacticalrmm/tacticalrmm/local_settings.py`
+
+### Configurações essenciais
+
+```python
+SECRET_KEY = "gerar_com_python_c_from_django_core_management_utils_import_get_random_secret_key"
+
+ALLOWED_HOSTS = ["api.example.com"]
+
+CORS_ORIGIN_WHITELIST = ["https://rmm.example.com"]
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "tacticalrmm",
+        "USER": "seu_usuario",
+        "PASSWORD": "sua_senha_forte",
+        "HOST": "127.0.0.1",
+        "PORT": "5432",
+    }
+}
+
+MESH_USERNAME = "tactical"
+MESH_SITE = "https://mesh.example.com"
+MESH_TOKEN_KEY = "token_gerado_pela_instalacao"
+
+REDIS_HOST = "127.0.0.1"
+```
+
+### Gerar SECRET_KEY seguro
+
+```bash
+python3 -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+---
+
+## Segurança (GuardianRMM)
+
+Melhorias de segurança aplicadas neste fork:
+
+### Autenticação
+- **Bypass 2FA removido**: Token `"sekret"` em modo DEBUG eliminado
+- **Bypass DEMO removido**: Autenticação incondicional em modo demo eliminada
+- **TOTP window reduzida**: De 10 para 1 (janela de ±30 segundos)
+
+### Permissões
+- **Deny-by-default**: Roles sem restrições explícitas negam acesso (era permitir tudo)
+- **Três funções corrigidas**: `_has_perm_on_agent`, `_has_perm_on_client`, `_has_perm_on_site`
+
+### Headers HTTP
+```
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+```
+
+### Rate Limiting (DRF)
+| Tipo | Limite |
+|------|--------|
+| Anônimo | 20 req/min |
+| Autenticado | 200 req/min |
+
+### Outras melhorias
+- **SSL habilitado**: Verificação de certificado em downloads do agente mesh (`verify=True`)
+- **NATS autenticado**: Opção `IgnoreAuthErrorAbort` removida
+- **Token TTL**: Reduzido de 5 horas para 1 hora
+- **SECRET_KEY**: Validação no startup — falha se não configurado ou muito curto
+- **ALLOWED_HOSTS**: Sem wildcard `*` em modo debug (usa `localhost` e `127.0.0.1`)
+
+---
+
+## Primeiro Acesso
+
+1. Acesse `https://rmm.example.com`
+2. Faça login com as credenciais definidas em `TRMM_USER`/`TRMM_PASS`
+3. Configure autenticação 2FA em: **Settings → My Profile → Enable 2FA**
+4. Adicione seu primeiro cliente em: **Clients → Add Client**
+5. Instale agentes nos dispositivos gerenciados
+
+---
+
+## Instalação de Agentes
+
+No dashboard, vá em **Clients → [seu cliente] → Install Agent** e siga o wizard para:
+- **Windows**: Baixar e executar o installer `.exe`
+- **Linux**: Executar o script de instalação via curl
+- **macOS**: Executar o script de instalação
+
+---
+
+## Serviços Systemd (Bare Metal)
+
+```bash
+# Verificar status de todos os serviços
+sudo systemctl status rmm.service
+sudo systemctl status daphne.service
+sudo systemctl status celery.service
+sudo systemctl status celerybeat.service
+sudo systemctl status nats.service
+
+# Reiniciar todos
+sudo systemctl restart rmm daphne celery celerybeat nats
+
+# Logs em tempo real
+sudo journalctl -u rmm -f
+```
+
+---
+
+## Backup e Restore
+
+### Backup manual (bare metal)
+
+```bash
+# Banco de dados
+pg_dump -U postgres tacticalrmm > backup_$(date +%Y%m%d).sql
+
+# Arquivos de configuração
+tar czf config_backup_$(date +%Y%m%d).tar.gz \
+    /rmm/api/tacticalrmm/tacticalrmm/local_settings.py \
+    /etc/nginx/sites-available/ \
+    /rmm/nats.conf
+```
+
+### Backup Docker
+
+```bash
+docker exec trmm-postgres pg_dump -U postgres tacticalrmm > backup.sql
+docker run --rm -v guardianrmm_tactical_data:/data -v $(pwd):/backup \
+    alpine tar czf /backup/tactical_data.tar.gz /data
+```
+
+---
+
+## Atualização
+
+### Docker
+
+```bash
+docker-compose pull
+docker-compose up -d
+```
+
+### Bare Metal
+
+```bash
+cd /rmm
+git pull
+source env/bin/activate
+pip install -r api/tacticalrmm/requirements.txt
+python api/tacticalrmm/manage.py migrate
+sudo systemctl restart rmm daphne celery celerybeat
+```
+
+---
+
+## Solução de Problemas
+
+**Agentes não conectam via NATS:**
+Verifique se a porta 4222 está acessível externamente e se as credenciais NATS batem com o `nats.conf`.
+
+**Erro 502 Bad Gateway:**
+```bash
+sudo systemctl status daphne rmm
+sudo journalctl -u daphne -n 50
+```
+
+**Celery não processa tarefas:**
+```bash
+sudo systemctl status celery celerybeat
+sudo journalctl -u celery -n 50
+```
+
+**MeshCentral não conecta:**
+```bash
+docker logs trmm-meshcentral -f
+# ou em bare metal:
+sudo journalctl -u meshcentral -n 50
+```
+
+**Reset de senha do admin:**
+```bash
+cd /rmm
+source env/bin/activate
+python api/tacticalrmm/manage.py changepassword <usuario>
+```
+
+**Logs Django:**
+```
+/rmm/api/tacticalrmm/tacticalrmm/private/log/trmm_debug.log
+/rmm/api/tacticalrmm/tacticalrmm/private/log/django_debug.log
+```
