@@ -48,46 +48,40 @@ class AuditMiddleware:
         return response
 
     def process_view(self, request, view_func, view_args, view_kwargs):
-        if not request.path.startswith(EXCLUDE_PATHS):
-            # https://stackoverflow.com/questions/26240832/django-and-middleware-which-uses-request-user-is-always-anonymous
-            try:
-                # DRF saves the class of the view function as the .cls property
-                view_class = view_func.cls
-                # We need to instantiate the class
-                view = view_class()
-                # And give it an action_map. It's not relevant for us, but otherwise it errors.
-                view.action_map = {}
-                # Here's our fully formed and authenticated (or not, depending on credentials) request
-                request = view.initialize_request(request)
-            except (AttributeError, TypeError):
-                from rest_framework.views import APIView
+        # Early return for excluded paths
+        if request.path.startswith(EXCLUDE_PATHS):
+            return
 
-                # Can't initialize the request from this view. Fallback to using default permission classes
-                request = APIView().initialize_request(request)
+        try:
+            # DRF saves the class of the view function as the .cls property
+            view_class = view_func.cls
+            view = view_class()
+            view.action_map = {}
+            request = view.initialize_request(request)
+        except (AttributeError, TypeError):
+            from rest_framework.views import APIView
 
-            # check if user is authenticated
-            with suppress(AuthenticationFailed):
-                if hasattr(request, "user") and request.user.is_authenticated:
-                    try:
-                        view_Name = view_func.__dict__["view_class"].__name__
-                    except:
-                        view_Name = view_func.__name__
-                    debug_info = {}
-                    # gather and save debug info
-                    debug_info["url"] = request.path
-                    debug_info["method"] = request.method
-                    debug_info["view_class"] = (
+            request = APIView().initialize_request(request)
+
+        # check if user is authenticated
+        with suppress(AuthenticationFailed):
+            if hasattr(request, "user") and request.user.is_authenticated:
+                try:
+                    view_Name = view_func.__dict__["view_class"].__name__
+                except (KeyError, AttributeError):
+                    view_Name = view_func.__name__
+                request_local.debug_info = {
+                    "url": request.path,
+                    "method": request.method,
+                    "view_class": (
                         view_func.cls.__name__ if hasattr(view_func, "cls") else None
-                    )
-                    debug_info["view_func"] = view_Name
-                    debug_info["view_args"] = view_args
-                    debug_info["view_kwargs"] = view_kwargs
-                    debug_info["ip"] = request._client_ip
-
-                    request_local.debug_info = debug_info
-
-                    # get authenticated user after request
-                    request_local.username = request.user.username
+                    ),
+                    "view_func": view_Name,
+                    "view_args": view_args,
+                    "view_kwargs": view_kwargs,
+                    "ip": request._client_ip,
+                }
+                request_local.username = request.user.username
 
     def process_exception(self, request, exception):
         request_local.debug_info = None
@@ -102,10 +96,10 @@ class AuditMiddleware:
 class LogIPMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
+        self._ipw = IpWare()  # Reuse instance across requests
 
     def __call__(self, request):
-        ipw = IpWare()
-        client_ip, _ = ipw.get_client_ip(request.META)
+        client_ip, _ = self._ipw.get_client_ip(request.META)
 
         request._client_ip = str(client_ip) if client_ip else ""
         response = self.get_response(request)
