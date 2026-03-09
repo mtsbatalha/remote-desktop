@@ -576,31 +576,41 @@ docker logs trmm-meshcentral -f
 sudo journalctl -u meshcentral -n 50
 ```
 
-**Reset de senha do admin RMM:**
+**Recuperação de acesso ao RMM (dashboard):**
+
 ```bash
 cd /rmm/api/tacticalrmm
 source /rmm/api/env/bin/activate
-python manage.py changepassword <usuario>
+
+# 1. Listar usuários existentes
+python manage.py shell -c "
+from django.contrib.auth import get_user_model
+for u in get_user_model().objects.all():
+    print(u.username, '| superuser:', u.is_superuser, '| active:', u.is_active)
+"
+
+# 2. Redefinir senha de um usuário existente
+python manage.py changepassword <username>
+
+# 3. Criar novo superusuário (se nenhum existir)
+python manage.py createsuperuser --username admin --email seu@email.com
 ```
 
-Veja também a seção **[Usuários e Credenciais](#usuários-e-credenciais-bare-metal)** para criar usuário caso não tenha sido criado durante a instalação.
+**Recuperação de acesso ao MeshCentral (conta de serviço):**
 
-**Reset de senha do MeshCentral (conta de serviço):**
 ```bash
-# Descobrir o username
+# 1. Descobrir o username da conta de serviço
 grep MESH_USERNAME /rmm/api/tacticalrmm/tacticalrmm/local_settings.py
 
-# Redefinir a senha
+# 2. Redefinir a senha
 cd /meshcentral
 node node_modules/meshcentral --resetaccount <mesh_username> --pass <nova_senha>
-```
 
-Após redefinir a senha do MeshCentral, atualize também o `local_settings.py` e reinicie os serviços:
-```bash
-# Editar MESH_TOKEN_KEY ou senha conforme necessário
-sudo nano /rmm/api/tacticalrmm/tacticalrmm/local_settings.py
+# 3. Reiniciar os serviços RMM
 sudo systemctl restart rmm daphne celery celerybeat
 ```
+
+> Após redefinir a senha do MeshCentral, o token de integração é regenerado automaticamente na próxima inicialização do RMM.
 
 **Logs Django:**
 ```
