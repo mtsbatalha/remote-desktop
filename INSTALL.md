@@ -444,6 +444,33 @@ chown -R rmm:rmm /opt/remote-desktop
 
 ---
 
+**Instalador sai sem erro após escolher SSL método 1 (Let's Encrypt HTTP)**
+
+O script verifica automaticamente se os 3 subdomínios resolvem para o IP público do servidor antes de pedir o certificado. Se algum não resolver, exibe o prompt:
+
+```
+Continue anyway? [y/N]:
+```
+
+Se o Enter for pressionado (ou qualquer tecla que não seja `y`), o script aborta com:
+
+```
+Aborted. Fix DNS first, then re-run the installer.
+```
+
+**Opções:**
+
+1. **Configurar DNS antes de instalar** (recomendado para produção): adicione os 3 registros A no seu provedor DNS e aguarde a propagação (use `dig api.example.com` para verificar).
+
+2. **Digitar `y` para continuar mesmo sem DNS**: útil se o DNS ainda está propagando e você quer testar o resto do fluxo. O Let's Encrypt falhará na emissão do certificado, mas o resto da instalação pode prosseguir.
+
+3. **Usar certificado self-signed para testes** (`--insecure`): não exige DNS configurado.
+   ```bash
+   bash install.sh --insecure
+   ```
+
+---
+
 **Erro: `curl: command not found` no início do install.sh**
 
 O script tenta instalar `curl` via `apt-get` no bootstrap, mas chama `curl` imediatamente depois. Isso ocorre quando o script é executado como root antes do `curl` ser instalado. Solução: rodar como usuário não-root (o `sudo apt-get install curl` do bootstrap funcionará normalmente) ou instalar curl manualmente antes:

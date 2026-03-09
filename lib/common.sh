@@ -134,6 +134,8 @@ _on_error() {
   local line_no="${1:-?}"
   local script="${2:-${BASH_SOURCE[0]}}"
   local msg="Script failed at line ${line_no} in $(basename "${script}") (exit code: ${exit_code})"
+  printf >&2 "\n${RED}ERROR: %s${NC}\n" "${msg}"
+  printf >&2 "${RED}Check the log for details: %s${NC}\n\n" "${TRMM_LOG_FILE}"
   log_error "${msg}"
   notify_failure "Script error" "${msg}
 
