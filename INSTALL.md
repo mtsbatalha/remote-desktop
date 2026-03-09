@@ -255,10 +255,82 @@ X-XSS-Protection: 1; mode=block
 
 ---
 
+## Usuários e Credenciais (Bare Metal)
+
+A instalação cria **dois sistemas independentes** com contas separadas:
+
+### 1. Usuário do RMM (dashboard Django)
+
+Criado durante a instalação pelo comando `python manage.py createsuperuser`. No modo interativo, o script pede o username **após** a etapa de SSL, com um prompt visível na tela:
+
+```
+****************************************************************
+Create your RMM admin login:
+****************************************************************
+Username: <você digita aqui>
+```
+
+Em seguida o Django pede a senha duas vezes. Esse usuário é usado para fazer login em `https://rmm.example.com`.
+
+> **Atenção:** esse prompt aparece após um `clear` de tela, no meio do processo de instalação. Se você não preencheu ou não notou, o usuário pode não ter sido criado. Verifique e corrija conforme abaixo.
+
+**Verificar se o usuário existe:**
+```bash
+cd /rmm/api/tacticalrmm
+source /rmm/api/env/bin/activate
+python manage.py shell -c "from django.contrib.auth import get_user_model; print(list(get_user_model().objects.values_list('username', flat=True)))"
+```
+
+**Criar usuário manualmente (se não criado):**
+```bash
+cd /rmm/api/tacticalrmm
+source /rmm/api/env/bin/activate
+python manage.py createsuperuser --username admin --email seu@email.com
+```
+
+**Redefinir senha de um usuário existente:**
+```bash
+cd /rmm/api/tacticalrmm
+source /rmm/api/env/bin/activate
+python manage.py changepassword <username>
+```
+
+---
+
+### 2. Conta de serviço do MeshCentral
+
+O MeshCentral é um sistema separado com seu próprio banco de usuários. O script cria automaticamente uma conta de serviço com **nome e senha aleatórios** para integrar o MeshCentral ao RMM. Essa conta **não é o mesmo usuário do dashboard RMM** — ela é usada internamente pelo backend Django para comunicar com o MeshCentral.
+
+As credenciais da conta MeshCentral ficam em dois lugares:
+
+**Username** (em `local_settings.py`):
+```bash
+grep MESH_USERNAME /rmm/api/tacticalrmm/tacticalrmm/local_settings.py
+```
+
+**Senha** — mostrada ao final da instalação em `print_summary`. Se você perdeu essa saída, recupere via CLI:
+```bash
+cd /meshcentral
+node node_modules/meshcentral --resetaccount <mesh_username> --pass <nova_senha>
+```
+
+> O usuário admin do RMM **não aparece no MeshCentral** — isso é esperado. O MeshCentral é acessado via integração do RMM, não diretamente pelo usuário do dashboard.
+
+---
+
+### Resumo: qual conta usar para quê?
+
+| Onde acessar | Usuário | Como foi criado |
+|---|---|---|
+| `https://rmm.example.com` | Definido por você durante a instalação | `createsuperuser` |
+| MeshCentral (integração interna) | Nome aleatório (ver `local_settings.py`) | `--createaccount` automático |
+
+---
+
 ## Primeiro Acesso
 
 1. Acesse `https://rmm.example.com`
-2. Faça login com as credenciais definidas em `TRMM_USER`/`TRMM_PASS`
+2. Faça login com o usuário criado durante a instalação (prompt "Create your RMM admin login:")
 3. Configure autenticação 2FA em: **Settings → My Profile → Enable 2FA**
 4. Adicione seu primeiro cliente em: **Clients → Add Client**
 5. Instale agentes nos dispositivos gerenciados
@@ -504,11 +576,30 @@ docker logs trmm-meshcentral -f
 sudo journalctl -u meshcentral -n 50
 ```
 
-**Reset de senha do admin:**
+**Reset de senha do admin RMM:**
 ```bash
-cd /rmm
-source env/bin/activate
-python api/tacticalrmm/manage.py changepassword <usuario>
+cd /rmm/api/tacticalrmm
+source /rmm/api/env/bin/activate
+python manage.py changepassword <usuario>
+```
+
+Veja também a seção **[Usuários e Credenciais](#usuários-e-credenciais-bare-metal)** para criar usuário caso não tenha sido criado durante a instalação.
+
+**Reset de senha do MeshCentral (conta de serviço):**
+```bash
+# Descobrir o username
+grep MESH_USERNAME /rmm/api/tacticalrmm/tacticalrmm/local_settings.py
+
+# Redefinir a senha
+cd /meshcentral
+node node_modules/meshcentral --resetaccount <mesh_username> --pass <nova_senha>
+```
+
+Após redefinir a senha do MeshCentral, atualize também o `local_settings.py` e reinicie os serviços:
+```bash
+# Editar MESH_TOKEN_KEY ou senha conforme necessário
+sudo nano /rmm/api/tacticalrmm/tacticalrmm/local_settings.py
+sudo systemctl restart rmm daphne celery celerybeat
 ```
 
 **Logs Django:**

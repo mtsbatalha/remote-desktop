@@ -1340,22 +1340,27 @@ print_summary() {
     BEHIND_NAT=true
   fi
 
-  printf >&2 "\n${YELLOW}%0.s*${NC}" {1..80}; printf >&2 "\n\n"
-  printf >&2 "${YELLOW}Installation complete!${NC}\n\n"
-  printf >&2 "${YELLOW}Access RMM at:${NC}          ${GREEN}https://${frontenddomain}${NC}\n"
-  printf >&2 "${YELLOW}MeshCentral username:${NC}   ${GREEN}${meshusername}${NC}\n"
-  printf >&2 "${YELLOW}MeshCentral password:${NC}   ${GREEN}${MESHPASSWD}${NC}\n"
-  printf >&2 "${YELLOW}Log file:${NC}               ${GREEN}${TRMM_LOG_FILE}${NC}\n\n"
+  printf >&2 '\n%s%0.s*%s' "${YELLOW}" {1..80} "${NC}"; printf >&2 '\n\n'
+  printf >&2 '%sInstallation complete!%s\n\n' "${YELLOW}" "${NC}"
+  printf >&2 '%s--- RMM Dashboard ------------------------------------------%s\n' "${YELLOW}" "${NC}"
+  printf >&2 '%sURL:%s                    %shttps://%s%s\n'  "${YELLOW}" "${NC}" "${GREEN}" "${frontenddomain}" "${NC}"
+  printf >&2 '%sUsername:%s               %s%s%s\n'          "${YELLOW}" "${NC}" "${GREEN}" "${djangousername}" "${NC}"
+  printf >&2 '%sPassword:%s               %s(set by you during install)%s\n\n' "${YELLOW}" "${NC}" "${GREEN}" "${NC}"
+  printf >&2 '%s--- MeshCentral (service account) ---------------------------%s\n' "${YELLOW}" "${NC}"
+  printf >&2 '%sUsername:%s               %s%s%s\n'          "${YELLOW}" "${NC}" "${GREEN}" "${meshusername}" "${NC}"
+  printf >&2 '%sPassword:%s               %s%s%s\n\n'        "${YELLOW}" "${NC}" "${GREEN}" "${MESHPASSWD}" "${NC}"
+  printf >&2 '%sLog file:%s               %s%s%s\n\n'        "${YELLOW}" "${NC}" "${GREEN}" "${TRMM_LOG_FILE}" "${NC}"
 
   if "${BEHIND_NAT}"; then
-    printf >&2 "${YELLOW}NOTE: Server is behind NAT (${IPV4}).${NC}\n"
-    printf >&2 "Ensure port 443 is forwarded and your 3 subdomains resolve to your public IP.\n"
+    printf >&2 '%sNOTE: Server is behind NAT (%s).%s\n' "${YELLOW}" "${IPV4}" "${NC}"
+    printf >&2 'Ensure port 443 is forwarded and your 3 subdomains resolve to your public IP.\n\n'
   fi
-  printf >&2 "${YELLOW}%0.s*${NC}" {1..80}; printf >&2 "\n"
+  printf >&2 '%s%0.s*%s' "${YELLOW}" {1..80} "${NC}"; printf >&2 '\n'
 
   notify_success "Installation complete" \
     "TacticalRMM installed successfully.
 Frontend: https://${frontenddomain}
+RMM user: ${djangousername}
 MeshCentral user: ${meshusername}
 Log: ${TRMM_LOG_FILE}"
 }
@@ -1413,8 +1418,8 @@ main() {
   configure_meshcentral
   finalize_setup
 
-  if [[ -d ~/.npm ]]; then sudo chown -R "$USER:$GROUP" ~/.npm; fi
-  if [[ -d ~/.config ]]; then sudo chown -R "$USER:$GROUP" ~/.config; fi
+  if [[ -d ~/.npm ]]; then sudo chown -R "$USER:$(id -gn)" ~/.npm; fi
+  if [[ -d ~/.config ]]; then sudo chown -R "$USER:$(id -gn)" ~/.config; fi
 
   print_summary
 }
