@@ -233,6 +233,10 @@ collect_input_auto() {
 # =============================================================================
 
 gen_secrets() {
+  # tr|fold|head pipelines trigger SIGPIPE (exit 141) on fold/tr when head exits
+  # after reading the first line. With set -o pipefail active this causes a
+  # spurious failure. Disable pipefail only for these assignments.
+  set +o pipefail
   DJANGO_SEKRET=$(tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w 80 | head -n 1)
   ADMINURL=$(tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w 70 | head -n 1)
   MESHPASSWD=$(tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w 25 | head -n 1)
@@ -241,6 +245,7 @@ gen_secrets() {
   meshusername=$(tr -dc 'a-z' </dev/urandom | fold -w 8 | head -n 1)
   MESHPGUSER=$(tr -dc 'a-z' </dev/urandom | fold -w 8 | head -n 1)
   MESHPGPWD=$(tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w 20 | head -n 1)
+  set -o pipefail
   log_info "Secrets generated."
 }
 
