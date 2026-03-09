@@ -312,7 +312,7 @@ https://apt.postgresql.org/pub/repos/apt/ ${codename}-pgdg main" \
   sudo systemctl enable --now postgresql
 
   until pg_isready >/dev/null 2>&1; do
-    printf "${GREEN}Waiting for PostgreSQL...${NC}\n"
+    printf '%s\n' "${GREEN}Waiting for PostgreSQL...${NC}"
     sleep 3
   done
 }
@@ -690,7 +690,7 @@ all(.value == false)
 '
   if ! jq -e "${check_filter}" "${mesh_cfg}" >/dev/null 2>&1; then
     log_info "Disabling mesh compression in config"
-    cp "${mesh_cfg}" ~/meshcfg-$(date "+%Y%m%dT%H%M%S").bak
+    cp "${mesh_cfg}" ~/"meshcfg-$(date "+%Y%m%dT%H%M%S").bak"
     local tmp; tmp=$(mktemp)
     if jq "${apply_filter}" "${mesh_cfg}" >"${tmp}" && [[ -s "${tmp}" ]]; then
       mv "${tmp}" "${mesh_cfg}"
@@ -737,6 +737,7 @@ enable_and_start_services() {
 # =============================================================================
 
 main() {
+  fix_hostname
   init_logging "restore"
   setup_error_trap
 
@@ -783,9 +784,9 @@ main() {
   rm -rf "${tmp_dir}"
 
   printf >&2 "\n${YELLOW}%0.s*${NC}" {1..80}; printf >&2 "\n\n"
-  printf >&2 "${YELLOW}Restore complete!${NC}\n\n"
-  printf >&2 "  Frontend:  ${GREEN}https://${API}${NC}\n"
-  printf >&2 "  Log file:  ${GREEN}${TRMM_LOG_FILE}${NC}\n"
+  printf >&2 '%s\n\n' "${YELLOW}Restore complete!${NC}"
+  printf >&2 '  Frontend:  %s\n' "${GREEN}https://${API}${NC}"
+  printf >&2 '  Log file:  %s\n' "${GREEN}${TRMM_LOG_FILE}${NC}"
   printf >&2 "\n${YELLOW}%0.s*${NC}" {1..80}; printf >&2 "\n"
 
   notify_success "Restore complete" \

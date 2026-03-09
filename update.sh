@@ -715,7 +715,7 @@ all(.value == false)
 '
   if ! jq -e "${check_filter}" "${mesh_cfg}" >/dev/null 2>&1; then
     log_info "Disabling mesh compression"
-    cp "${mesh_cfg}" ~/meshcfg-$(date "+%Y%m%dT%H%M%S").bak
+    cp "${mesh_cfg}" ~/"meshcfg-$(date "+%Y%m%dT%H%M%S").bak"
     local tmp; tmp=$(mktemp)
     if jq "${apply_filter}" "${mesh_cfg}" >"${tmp}" && [[ -s "${tmp}" ]]; then
       mv "${tmp}" "${mesh_cfg}"
@@ -742,6 +742,7 @@ start_services() {
 # =============================================================================
 
 main() {
+  fix_hostname
   init_logging "update"
   setup_error_trap
 

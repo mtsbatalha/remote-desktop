@@ -1360,6 +1360,7 @@ Log: ${TRMM_LOG_FILE}"
 # =============================================================================
 
 main() {
+  fix_hostname
   init_logging "install"
   setup_error_trap
 

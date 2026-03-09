@@ -399,6 +399,62 @@ Verifica: OS suportado, RAM, resolução DNS dos 3 subdomínios (local e remoto 
 
 ## Solução de Problemas
 
+**Erro: `Do NOT run this script as root. Exiting.`**
+
+Os scripts de instalação, atualização e restore não podem ser executados como `root`. Crie um usuário não-root com sudo passwordless:
+
+```bash
+adduser rmm
+usermod -aG sudo rmm
+echo "rmm ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/rmm
+su - rmm
+cd /opt/remote-desktop
+bash install.sh
+```
+
+---
+
+**Erro: `sudo: unable to resolve host <hostname>: Name or service not known`**
+
+O hostname do servidor não está mapeado em `/etc/hosts`. Adicione a entrada manualmente:
+
+```bash
+echo "127.0.0.1 $(hostname)" | sudo tee -a /etc/hosts
+```
+
+---
+
+**Erro: `Permission denied` ao criar arquivo de log (`/var/log/trmm/`)**
+
+O diretório `/var/log/trmm/` não existe ou pertence ao root. Execute como root antes de rodar o script:
+
+```bash
+mkdir -p /var/log/trmm
+chown <seu-usuario>:<seu-usuario> /var/log/trmm
+chown -R <seu-usuario>:<seu-usuario> /opt/remote-desktop
+```
+
+Exemplo com usuário `rmm`:
+
+```bash
+mkdir -p /var/log/trmm
+chown rmm:rmm /var/log/trmm
+chown -R rmm:rmm /opt/remote-desktop
+```
+
+---
+
+**Erro: `curl: command not found` no início do install.sh**
+
+O script tenta instalar `curl` via `apt-get` no bootstrap, mas chama `curl` imediatamente depois. Isso ocorre quando o script é executado como root antes do `curl` ser instalado. Solução: rodar como usuário não-root (o `sudo apt-get install curl` do bootstrap funcionará normalmente) ou instalar curl manualmente antes:
+
+```bash
+sudo apt-get install -y curl
+bash install.sh
+```
+
+---
+
 **Agentes não conectam via NATS:**
 Verifique se a porta 4222 está acessível externamente e se as credenciais NATS batem com o `nats.conf`.
 

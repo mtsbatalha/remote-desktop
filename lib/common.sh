@@ -32,6 +32,8 @@ _ensure_log_dir() {
   if [[ ! -d "${TRMM_LOG_DIR}" ]]; then
     sudo mkdir -p "${TRMM_LOG_DIR}"
     sudo chown "${USER}:${USER}" "${TRMM_LOG_DIR}"
+  elif [[ ! -w "${TRMM_LOG_DIR}" ]]; then
+    sudo chown "${USER}:${USER}" "${TRMM_LOG_DIR}"
   fi
 }
 
@@ -149,7 +151,21 @@ setup_error_trap() {
 check_not_root() {
   if [[ "${EUID}" -eq 0 ]]; then
     print_error "Do NOT run this script as root. Exiting."
+    printf >&2 "Create a non-root user and run as that user:\n"
+    printf >&2 "  adduser <user> && usermod -aG sudo <user>\n"
+    printf >&2 "  echo '<user> ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/<user>\n"
     exit 1
+  fi
+}
+
+# Ensures the server hostname resolves locally (suppresses sudo warnings).
+# Safe to call before init_logging — uses printf instead of log_info.
+fix_hostname() {
+  local host; host=$(hostname 2>/dev/null || true)
+  [[ -z "${host}" ]] && return 0
+  if ! getent hosts "${host}" >/dev/null 2>&1; then
+    printf "${YELLOW}Hostname '%s' not in /etc/hosts — adding it automatically.${NC}\n" "${host}" >&2
+    echo "127.0.0.1 ${host}" | sudo tee -a /etc/hosts >/dev/null
   fi
 }
 
