@@ -42,19 +42,38 @@ mesh.example.com    → IP_DO_SERVIDOR
 
 ## Instalação em Servidor (Script)
 
+### Modo interativo (padrão)
+
 ```bash
-# Baixar e executar o script de instalação
-wget -q https://raw.githubusercontent.com/<seu-repo>/main/install.sh
-chmod +x install.sh
-./install.sh
+./install.sh                  # Let's Encrypt (padrão)
+./install.sh --use-own-cert   # certificado próprio (custom)
+./install.sh --insecure       # certificado self-signed
+```
+
+### Modo automatizado (sem prompts)
+
+```bash
+export TRMM_API_DOMAIN="api.example.com"
+export TRMM_FRONTEND_DOMAIN="rmm.example.com"
+export TRMM_MESH_DOMAIN="mesh.example.com"
+export TRMM_ROOT_DOMAIN="example.com"
+export TRMM_EMAIL="admin@example.com"
+export TRMM_ADMIN_USER="admin"
+export TRMM_CERT_MODE="letsencrypt"   # letsencrypt | insecure | custom
+
+# Para certificado próprio:
+# export TRMM_CERT_FILE="/path/to/fullchain.pem"
+# export TRMM_KEY_FILE="/path/to/privkey.pem"
+
+./install.sh --auto
 ```
 
 O script irá:
-1. Verificar requisitos (OS, RAM, arquitetura)
-2. Instalar dependências (PostgreSQL, Redis, NATS, Python, Nginx)
-3. Configurar certificados SSL (Let's Encrypt ou self-signed)
+1. Verificar requisitos (OS, RAM, arquitetura, locale)
+2. Instalar dependências (PostgreSQL 15, Redis, NATS, Python 3.11, Nginx, NodeJS)
+3. Configurar certificados SSL (Let's Encrypt, self-signed ou custom)
 4. Criar banco de dados com credenciais aleatórias
-5. Configurar NexusMesh (MeshCentral) integrado
+5. Configurar MeshCentral integrado
 6. Criar serviços systemd
 7. Gerar QR code para autenticação 2FA
 
@@ -276,18 +295,38 @@ sudo journalctl -u rmm -f
 
 ## Backup e Restore
 
-### Backup manual (bare metal)
+### Backup (bare metal)
 
 ```bash
-# Banco de dados
-pg_dump -U postgres tacticalrmm > backup_$(date +%Y%m%d).sql
-
-# Arquivos de configuração
-tar czf config_backup_$(date +%Y%m%d).tar.gz \
-    /rmm/api/tacticalrmm/tacticalrmm/local_settings.py \
-    /etc/nginx/sites-available/ \
-    /rmm/nats.conf
+./backup.sh                    # backup manual em /rmmbackups/
+./backup.sh --auto             # backup com rotação (uso via cron)
+./backup.sh --schedule         # instala cron diário à meia-noite
+./backup.sh --list             # lista backups existentes com tamanho
+./backup.sh --verify <arquivo> # verifica integridade de um backup
 ```
+
+O backup inclui: dump PostgreSQL (tacticalrmm + meshcentral), arquivos do MeshCentral, certificados SSL, configs Nginx, units systemd, `local_settings.py` e `/opt/tactical`.
+
+**Política de rotação automática (`--auto`):**
+
+| Tipo | Retenção | Quando |
+|------|----------|--------|
+| Daily | 14 dias | Seg–Qui, Sáb, Dom |
+| Weekly | 60 dias | Toda sexta-feira |
+| Monthly | 380 dias | Dia 1 de cada mês |
+
+**Configurar cron automático:**
+```bash
+./backup.sh --schedule
+```
+
+### Restore (bare metal)
+
+```bash
+./restore.sh /rmmbackups/rmm-backup-YYYY_MM_DD__HH_MM_SS.tar
+```
+
+Requisitos: servidor limpo, mesmo usuário não-root da instalação original. O script instala todas as dependências automaticamente e suporta migração de MongoDB para PostgreSQL em backups antigos.
 
 ### Backup Docker
 
@@ -311,13 +350,50 @@ docker-compose up -d
 ### Bare Metal
 
 ```bash
-cd /rmm
-git pull
-source env/bin/activate
-pip install -r api/tacticalrmm/requirements.txt
-python api/tacticalrmm/manage.py migrate
-sudo systemctl restart rmm daphne celery celerybeat
+./update.sh           # atualiza se houver nova versão
+./update.sh --force   # força re-instalação mesmo já na última versão
 ```
+
+O script atualiza automaticamente: Python, NATS, MeshCentral, repositórios git, dependências pip, banco de dados (migrations) e frontend.
+
+> Deve ser executado com o mesmo usuário não-root usado na instalação.
+
+---
+
+## Desinstalação
+
+```bash
+./uninstall.sh           # interativo (confirmação dupla)
+./uninstall.sh --force   # pula confirmações (PERIGOSO)
+```
+
+Remove: serviços systemd, bancos de dados PostgreSQL, diretórios (`/rmm`, `/meshcentral`, `/opt/tactical`, `/var/www/rmm`), configs Nginx, binários NATS, entradas no cron e `/etc/hosts`.
+
+> **Sempre faça backup antes de desinstalar:** `./backup.sh`
+
+---
+
+## Notificações por Email
+
+```bash
+./setup_notifications.sh           # configuração interativa
+./setup_notifications.sh --test    # envia email de teste
+./setup_notifications.sh --show    # exibe configuração atual
+./setup_notifications.sh --remove  # remove configuração
+```
+
+Suporta msmtp (recomendado), mailutils ou sendmail. Após configurar, todos os scripts (install, update, backup, restore) enviam alertas automaticamente. A configuração fica em `/etc/trmm/notify.conf`.
+
+---
+
+## Diagnóstico (troubleshoot_server.sh)
+
+```bash
+sudo apt install resolvconf   # pré-requisito
+./troubleshoot_server.sh
+```
+
+Verifica: OS suportado, RAM, resolução DNS dos 3 subdomínios (local e remoto via 8.8.8.8), status de todos os serviços, porta 443, detecção de proxy e validade do certificado SSL. Gera `checklog.log` no diretório atual.
 
 ---
 
